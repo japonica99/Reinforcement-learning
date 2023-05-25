@@ -150,8 +150,6 @@ class FaceBeautificationEnv(gym.Env):
         # TODO: implement here
         pass
 
-
-#todo：test 部分还没有修改传特征点的事情
 class FaceBeautificationEnvTest(FaceBeautificationEnv):
 
     def __init__(self,
