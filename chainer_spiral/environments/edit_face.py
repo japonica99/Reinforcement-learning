@@ -1,13 +1,14 @@
 try:
-    from .face_tools import ImageTransformer,Mls_deformer
+    from .face_tools import ImageTransformer,Mls_deformer,TriangularWarp
 except:
-    from face_tools import ImageTransformer,Mls_deformer
+    from face_tools import ImageTransformer,Mls_deformer,TriangularWarp
 
 import cv2
 import numpy as np
 import dlib
 import math
 from copy import deepcopy
+#from pychubby.base import DisplacementField
 
 
 def nothing(x):
@@ -131,7 +132,7 @@ class AdjustNoseHeight():
         self.slider_names = ["noseheight"]
 
     def __call__(self, parameters,feature_list):
-        feature_list_ = feature_list
+        feature_list_ = deepcopy(feature_list)
         for i in range(31,36):
             feature_list_[0][i][1] = int(feature_list[0][i][1] + 0.5 * parameters[0] * (feature_list[0][i][1] - feature_list[0][30][1]))
         return feature_list_
@@ -143,7 +144,7 @@ class AdjustNoseWidth():
         self.slider_names = ["nosewidth"]
 
     def __call__(self, parameters,feature_list):
-        feature_list_ = feature_list
+        feature_list_ = deepcopy(feature_list)
         for i in range(31,36):
             feature_list_[0][i][0] = int(feature_list[0][i][0] + 0.5 * parameters[0] * (feature_list[0][i][0] - feature_list[0][33][0]))
         return feature_list_
@@ -155,10 +156,10 @@ class AdjustUpperLipHeight():
         self.slider_names = ["upperlipheight"]
 
     def __call__(self, parameters,feature_list):
-        feature_list_ = feature_list
+        feature_list_ = deepcopy(feature_list)
         height = feature_list[0][51][1] - feature_list[0][57][1]
         for i in range(48,55):
-           feature_list_[0][i][1] = int(feature_list[0][i][1] + 0.1 * parameters[0] * height)
+           feature_list_[0][i][1] = int(feature_list[0][i][1] + 0.01 * parameters[0] * height)
         return feature_list_
 
 class AdjustDownLipHeight():
@@ -168,7 +169,7 @@ class AdjustDownLipHeight():
         self.slider_names = ["downlipheight"]
 
     def __call__(self, parameters,feature_list):
-        feature_list_ = feature_list
+        feature_list_ = deepcopy(feature_list)
         height = feature_list[0][51][1] - feature_list[0][57][1]
         for i in range(55,60):
            feature_list_[0][i][1] = int(feature_list[0][i][1] - 0.5 * parameters[0] * height)
@@ -181,7 +182,7 @@ class AdjustMouthHeight():
         self.slider_names = ["mouthheight"]
 
     def __call__(self, parameters,feature_list):
-        feature_list_ = feature_list
+        feature_list_ = deepcopy(feature_list)
         height = feature_list[0][51][1] - feature_list[0][57][1]
         for i in range(48,68):
            feature_list_[0][i][1] = int(feature_list[0][i][1] + 0.5 * parameters[0] * height)
@@ -194,9 +195,10 @@ class AdjustMouthWidth():
         self.slider_names = ["mouthwidth"]
 
     def __call__(self, parameters,feature_list):
-        feature_list_ = feature_list
+        feature_list_ = deepcopy(feature_list)
         for i in range(48,68):
            feature_list_[0][i][0] = int(feature_list[0][i][0] + 0.3 * parameters[0] * (feature_list[0][i][0] - feature_list[0][66][0]))
+
         return feature_list_
 
 class AdjustChinWidth():
@@ -206,9 +208,10 @@ class AdjustChinWidth():
         self.slider_names = ["chinwidth"]
 
     def __call__(self, parameters,feature_list):
-        feature_list_ = feature_list
+        feature_list_ = deepcopy(feature_list)
         for i in range(0,17):
-           feature_list_[0][i][0] = int(feature_list[0][i][0] - 0.1 * parameters[0] * (feature_list[0][i][0] - feature_list[0][34][0]))
+            feature_list_[0][i][0] = int(feature_list[0][i][0] - 0.1 * parameters[0] * (feature_list[0][i][0] - feature_list[0][34][0]))
+
         return feature_list_
 
 class FaceEditor():
@@ -222,7 +225,7 @@ class FaceEditor():
         for edit_landmarks_func in self.edit_landmarks_funcs:
             self.num_parameters += edit_landmarks_func.num_parameters
 
-    def __call__(self, photo, parameters,feature_points_list):
+    def __call__(self, photo, parameters,feature_points_list,**interpolation_kwargs):
         output_list = [photo]
         num_parameters = 0
 
@@ -234,19 +237,40 @@ class FaceEditor():
 
         original_landmarks = deepcopy(feature_points_list[0])
         #mls = trans(output_list[0], np.array(feature_points_list[0]))
+        self.feature_points_list = feature_points_list
         for edit_landmarks_func in self.edit_landmarks_funcs:
             self.feature_points_list = edit_landmarks_func(parameters[num_parameters: num_parameters + edit_landmarks_func.num_parameters],
-                                    feature_points_list)
+                                    self.feature_points_list)
+
             num_parameters = num_parameters + edit_landmarks_func.num_parameters
 
         #用原图的landmarks和变换后的landmarks做mls变换
         #img = mls.deformation(output_list[0], np.array(self.feature_points_list[0]))
 
-        #trans = ImageTransformer(output_list[0], np.array(original_landmarks)[:,[1,0]],np.array(self.feature_points_list[0])[:,[1,0]],color_dim=2, interp_order=2,extrap_mode='nearest')
-        #img = trans.deform_viewport()
+        # trans = ImageTransformer(output_list[0], np.array(original_landmarks)[:,[1,0]],np.array(self.feature_points_list[0])[:,[1,0]],color_dim=2, interp_order=2,extrap_mode='nearest')
+        # img = trans.deform_viewport()
 
-        deformer = Mls_deformer(output_list[0])
-        img = deformer.trans(np.array(original_landmarks)[:,[1,0]],np.array(self.feature_points_list[0])[:,[1,0]],mode='affine')
+        diangle = TriangularWarp(np.array(original_landmarks),
+                                 np.array(self.feature_points_list[0]),
+                                 #np.array(original_landmarks),
+                                 output_list[0])
+        img = diangle.warp()
+        #img = diangle.draw()
+
+        # deformer = Mls_deformer(output_list[0])
+        # img = deformer.trans(np.array(original_landmarks)[:,[1,0]],np.array(self.feature_points_list[0])[:,[1,0]],mode='affine')
+
+        # if not interpolation_kwargs:
+        #     interpolation_kwargs = {"function": "linear"}
+        #
+        # df = DisplacementField.generate(output_list[0].shape[:2],
+        #                                 np.array(original_landmarks)[:, [1, 0]],
+        #                                 np.array(self.feature_points_list[0])[:, [1, 0]],
+        #                                 anchor_corners=True,
+        #                                 **interpolation_kwargs
+        #                                 )
+        # output_list[0] = df.warp(output_list[0])
+
 
         # for i,p in enumerate(self.feature_points_list[0]):
         #     print(i)
@@ -254,6 +278,7 @@ class FaceEditor():
         #     cv2.line(img, (p[0], p[1]), (p1[0], p1[1]), (0, 255, 0), 1)
         #     #cv2.circle(img, (p[0], p[1]), 2, (0, 255, 0), -1)
 
+        # return img
         return img
 
     def extract_feature(self,photo,newsize):
@@ -269,6 +294,7 @@ class FaceEditor():
             shape = predictor(photo, face_rect)
             feature_points = [[int(shape.part(i).x / photo.shape[0] * newsize[0]), int(shape.part(i).y / photo.shape[1] * newsize[1])] for i in range(68)]
             feature_points_list.append(feature_points)
+
         return feature_points_list
 
 
@@ -321,7 +347,7 @@ def edit_demo(photo, parameters_=None):
 
 if __name__=="__main__":
     parameters = np.array([0.125,0.5,0.5,0.3,0.3,0.3,0.5,0.5])
-    #parameters = np.array([0.5])
+    #parameters = np.array([0.5,0.5,0.5])
     image = cv2.imread("../../scutfbp5500_dataset/origin/AF1.jpg")
     #image = cv2.imread("../../images/1039.png")
     edit_demo(image, parameters)
