@@ -93,8 +93,8 @@ class AdjustEyeSize():
         left_eye_pos = np.add(feature_list[0][36], feature_list[0][39]) / 2
         right_eye_pos = np.add(feature_list[0][42], feature_list[0][45]) / 2
         r_max = int(np.linalg.norm(np.subtract(feature_list[0][36], feature_list[0][39])))
-        editted_ = self.Local_scaling_warps(editted, int(left_eye_pos[0]), int(left_eye_pos[1]), r_max=r_max, a=parameters[0])
-        editted_ = self.Local_scaling_warps(editted_, int(right_eye_pos[0]), int(right_eye_pos[1]), r_max=r_max, a=parameters[0])
+        editted_ = self.Local_scaling_warps(editted, int(left_eye_pos[0]), int(left_eye_pos[1]), r_max=r_max, a=0.5 * parameters[0])
+        editted_ = self.Local_scaling_warps(editted_, int(right_eye_pos[0]), int(right_eye_pos[1]), r_max=r_max, a=0.5 * parameters[0])
         return [editted_]
 
     def bilinear_interpolation(self,img, vector_u, c):
@@ -134,7 +134,7 @@ class AdjustNoseHeight():
     def __call__(self, parameters,feature_list):
         feature_list_ = deepcopy(feature_list)
         for i in range(31,36):
-            feature_list_[0][i][1] = int(feature_list[0][i][1] + 0.5 * parameters[0] * (feature_list[0][i][1] - feature_list[0][30][1]))
+            feature_list_[0][i][1] = int(feature_list[0][i][1] + 0.2 * parameters[0] * (feature_list[0][i][1] - feature_list[0][30][1]))
         return feature_list_
 
 class AdjustNoseWidth():
@@ -146,7 +146,7 @@ class AdjustNoseWidth():
     def __call__(self, parameters,feature_list):
         feature_list_ = deepcopy(feature_list)
         for i in range(31,36):
-            feature_list_[0][i][0] = int(feature_list[0][i][0] + 0.5 * parameters[0] * (feature_list[0][i][0] - feature_list[0][33][0]))
+            feature_list_[0][i][0] = int(feature_list[0][i][0] + 0.2 * parameters[0] * (feature_list[0][i][0] - feature_list[0][33][0]))
         return feature_list_
 
 class AdjustUpperLipHeight():
@@ -159,7 +159,7 @@ class AdjustUpperLipHeight():
         feature_list_ = deepcopy(feature_list)
         height = feature_list[0][51][1] - feature_list[0][57][1]
         for i in range(48,55):
-           feature_list_[0][i][1] = int(feature_list[0][i][1] + 0.01 * parameters[0] * height)
+           feature_list_[0][i][1] = int(feature_list[0][i][1] + 0.1 * parameters[0] * height)
         return feature_list_
 
 class AdjustDownLipHeight():
@@ -172,7 +172,7 @@ class AdjustDownLipHeight():
         feature_list_ = deepcopy(feature_list)
         height = feature_list[0][51][1] - feature_list[0][57][1]
         for i in range(55,60):
-           feature_list_[0][i][1] = int(feature_list[0][i][1] - 0.5 * parameters[0] * height)
+           feature_list_[0][i][1] = int(feature_list[0][i][1] - 0.2 * parameters[0] * height)
         return feature_list_
 
 class AdjustMouthHeight():
@@ -185,7 +185,7 @@ class AdjustMouthHeight():
         feature_list_ = deepcopy(feature_list)
         height = feature_list[0][51][1] - feature_list[0][57][1]
         for i in range(48,68):
-           feature_list_[0][i][1] = int(feature_list[0][i][1] + 0.5 * parameters[0] * height)
+           feature_list_[0][i][1] = int(feature_list[0][i][1] + 0.2 * parameters[0] * height)
         return feature_list_
 
 class AdjustMouthWidth():
@@ -197,7 +197,7 @@ class AdjustMouthWidth():
     def __call__(self, parameters,feature_list):
         feature_list_ = deepcopy(feature_list)
         for i in range(48,68):
-           feature_list_[0][i][0] = int(feature_list[0][i][0] + 0.3 * parameters[0] * (feature_list[0][i][0] - feature_list[0][66][0]))
+           feature_list_[0][i][0] = int(feature_list[0][i][0] + 0.1 * parameters[0] * (feature_list[0][i][0] - feature_list[0][66][0]))
 
         return feature_list_
 
@@ -210,7 +210,7 @@ class AdjustChinWidth():
     def __call__(self, parameters,feature_list):
         feature_list_ = deepcopy(feature_list)
         for i in range(0,17):
-            feature_list_[0][i][0] = int(feature_list[0][i][0] - 0.1 * parameters[0] * (feature_list[0][i][0] - feature_list[0][34][0]))
+            feature_list_[0][i][0] = int(feature_list[0][i][0] - 0.15 * parameters[0] * (feature_list[0][i][0] - feature_list[0][34][0]))
 
         return feature_list_
 
@@ -244,15 +244,16 @@ class FaceEditor():
 
             num_parameters = num_parameters + edit_landmarks_func.num_parameters
 
+
         #用原图的landmarks和变换后的landmarks做mls变换
         #img = mls.deformation(output_list[0], np.array(self.feature_points_list[0]))
 
         # trans = ImageTransformer(output_list[0], np.array(original_landmarks)[:,[1,0]],np.array(self.feature_points_list[0])[:,[1,0]],color_dim=2, interp_order=2,extrap_mode='nearest')
         # img = trans.deform_viewport()
 
-        diangle = TriangularWarp(np.array(original_landmarks),
-                                 np.array(self.feature_points_list[0]),
-                                 #np.array(original_landmarks),
+        #注意这边这样clip只能针对正方形输入
+        diangle = TriangularWarp(np.clip(np.array(original_landmarks),0,output_list[0].shape[0] - 1),
+                                 np.clip(np.array(self.feature_points_list[0]),0,output_list[0].shape[0] - 1),
                                  output_list[0])
         img = diangle.warp()
         #img = diangle.draw()
@@ -292,7 +293,7 @@ class FaceEditor():
         feature_points_list = []
         for face_rect in face_rects:
             shape = predictor(photo, face_rect)
-            feature_points = [[int(shape.part(i).x / photo.shape[0] * newsize[0]), int(shape.part(i).y / photo.shape[1] * newsize[1])] for i in range(68)]
+            feature_points = [[int(shape.part(i).x / photo.shape[0] * (newsize[0] - 1)), int(shape.part(i).y / photo.shape[1] * (newsize[1] - 1))] for i in range(68)]
             feature_points_list.append(feature_points)
 
         return feature_points_list

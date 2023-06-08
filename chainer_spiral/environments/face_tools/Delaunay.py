@@ -13,6 +13,7 @@ class TriangularWarp:
         subdiv_dst = cv2.Subdiv2D(rect)
         pair = {}
         for s,d in zip(src,dst):
+            #print(s,d)
             subdiv_src.insert((int(s[0]), int(s[1])))
             pair[(int(s[0]), int(s[1]))] = (int(d[0]), int(d[1]))
         bolder = [(0, h - 1),(w / 2, h - 1),(w / 2, 0),(0, h / 2),(w - 1, h / 2),(w - 1, h - 1),(w - 1, 0),(1, 1)]
@@ -35,7 +36,6 @@ class TriangularWarp:
 
             tri1 = np.float32([[[src[0], src[1]], [src[2], src[3]], [src[4], src[5]]]])
             tri2 = np.float32([[[dst[0], dst[1]], [dst[2], dst[3]], [dst[4], dst[5]]]])
-            print(tri1,tri2)
             r1 = cv2.boundingRect(tri1)
             r2 = cv2.boundingRect(tri2)
             tri1Cropped = []
